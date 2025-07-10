@@ -1,1 +1,1 @@
-# VMU
+VMU is a program that allows you to rate and create 12 word seed phrases and also allows you to create mnemonics to help remember said phrases using llama-cpp library specifically Q4_K_M. You will need to download said gguf or a differing model and replacce the path in the program for it to work. 
