@@ -1,0 +1,160 @@
+import random
+import math
+import tkinter as tk
+from mnemonic import Mnemonic
+from tkinter import messagebox
+from tkinter import scrolledtext
+from llama_cpp import Llama
+
+mnemo = Mnemonic('english')
+
+def entropy(seed_phrase):
+    words = seed_phrase.split()
+    word_freq = {}
+    for word in set(words):
+        count = words.count(word)
+        word_freq[word] = count
+
+    total_words = len(words)
+    entropy = 0.0
+    
+    for count in word_freq.values():
+        probability = count / total_words
+        if probability > 0:
+            entropy_part = probability * math.log2(probability)
+        else:
+            entropy_part = 0
+        entropy -= entropy_part
+    return entropy
+
+def generate_phrases():
+    #clears window
+    for widget in croot.winfo_children():
+        if widget not in [btn_create]:
+            widget.destroy()
+    
+    tk.Label(croot, text="Phrase").grid(row=0, column=1)
+    tk.Label(croot, text="Entropy").grid(row=0, column=2)
+    for i in range(1, 5):
+        phrase = mnemo.generate(strength=128)
+        ent = entropy(phrase)
+        
+        tk.Label(croot, text=str(i)).grid(row=i, column=0)
+        tk.Label(croot, text=phrase).grid(row=i, column=1)
+        tk.Label(croot, text=str(round(ent, 2))).grid(row=i, column=2)
+
+def creator_setup():
+    global croot, btn_create
+    croot = tk.Toplevel()
+    croot.title("Phrase Creator")
+    croot.geometry("700x400")
+    
+    btn_create = tk.Button(croot, text="Generate Phrases", command=generate_phrases)
+    btn_create.grid(row=0, column=0)
+
+def analyzer_setup():    
+    aroot = tk.Toplevel()
+    aroot.title("Phrase Analyzer")
+    aroot.geometry("600x200")
+    
+    main_frame = tk.Frame(aroot)
+    main_frame.pack(pady=20, padx=20, fill=tk.BOTH, expand=True)
+    
+    entry = tk.Entry(main_frame, width=70)
+    entry.pack(pady=10)
+    
+    result_label = tk.Label(main_frame, text="Entropy: ", relief=tk.SUNKEN, width=60)
+    result_label.pack(pady=10)
+    
+    def analyze_phrase():
+        phrase = entry.get()
+        if phrase.strip() == "":
+            result_label.config(text="Please enter a phrase")
+            return
+            
+        score = entropy(phrase)
+        result_label.config(text=f"Entropy: {score:.2f} bits/word")
+    
+    btn_analyze = tk.Button(main_frame, text="Analyze Phrase", command=analyze_phrase)
+    btn_analyze.pack()
+
+def mnemonic_helper_setup():
+    helper_window = tk.Toplevel()
+    helper_window.title("Mnemonic Helper")
+    helper_window.geometry("800x600")
+    
+    input_frame = tk.Frame(helper_window)
+    input_frame.pack(pady=10)
+    
+    tk.Label(input_frame, text="Enter your seed phrase:").pack()
+    seed_entry = tk.Entry(input_frame, width=80)
+    seed_entry.pack(pady=5)
+
+    output_frame = tk.Frame(helper_window)
+    output_frame.pack(pady=10, fill=tk.BOTH)
+    
+    tk.Label(output_frame, text="Memory Aid:").pack()
+    output_text = scrolledtext.ScrolledText(output_frame, width=80, height=20, wrap=tk.WORD)
+    output_text.pack(fill=tk.BOTH)
+    
+    def generate_memory_aid():
+        seed_phrase = seed_entry.get().strip()
+        if not seed_phrase:
+            output_text.delete(1.0, tk.END)
+            output_text.insert(tk.END, "Please enter a seed phrase first!")
+            return
+        
+        output_text.delete(1.0, tk.END)
+        output_text.insert(tk.END, "Generating memory aid... (this may take a minute)")
+        helper_window.update()
+        
+        try:
+            llm = Llama(
+                model_path=r"C:\Users\capybarahermes-2.5-mistral-7b.Q4_K_M.gguf",  # Replace with your model and path
+                n_ctx=2048,
+                n_threads=4
+            )
+            
+            prompt = f"""
+            Create a memorable story or association to help remember this cryptocurrency seed phrase:
+            {seed_phrase}
+            
+            The memory aid should:
+            1. Be creative but easy to remember
+            2. Create associations between the words
+            3. Be about 5-7 sentences long
+            4. Use vivid imagery
+            
+            Memory aid:
+            """
+            response = llm(
+                prompt=prompt,
+                max_tokens=400,
+                temperature=0.7,
+                top_p=0.9
+            )
+            
+            output_text.delete(1.0, tk.END)
+            output_text.insert(tk.END, response['choices'][0]['text'])
+            
+        except Exception as e:
+            output_text.delete(1.0, tk.END)
+            output_text.insert(tk.END, f"Error: {str(e)}")
+    
+    generate_btn = tk.Button(helper_window, text="Generate Memory Aid", command=generate_memory_aid)
+    generate_btn.pack(pady=10)
+
+root = tk.Tk() 
+root.title("VaultMeUp")
+root.geometry("300x200+550+200")
+
+create = tk.Button(root, text="Create phrase", command=creator_setup)
+create.pack(pady=10)
+
+analyze = tk.Button(root, text="Rate phrase", command=analyzer_setup)
+analyze.pack(pady=10)
+
+helper_btn = tk.Button(root, text="Memory Helper", command=mnemonic_helper_setup)
+helper_btn.pack(pady=10)
+
+root.mainloop()
